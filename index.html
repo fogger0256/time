@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>カスタムアナログ時計</title>
+<style>
+  /* 画面全体の背景を黒に設定 */
+  body {
+    background-color: #000000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+  }
+
+  /* 時計の基盤（文字盤） */
+  .watch-face {
+    width: 300px;
+    height: 300px;
+    background-color: #1a1a1a; /* 写真の基盤に合わせたダークグレー */
+    border-radius: 50%;
+    position: relative;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.9); /* 文字盤の深みを出す */
+  }
+
+  /* 立体的なインデックス（時間の目盛り） */
+  .marker {
+    position: absolute;
+    width: 14px;
+    height: 35px;
+    background-color: #2a2a2a;
+    top: 0;
+    left: 50%;
+    margin-left: -7px;
+    transform-origin: 50% 150px; /* 時計の中心を軸にする */
+    border-radius: 2px;
+    /* G-SHOCK特有の立体感を影で表現 */
+    box-shadow: inset -1px -1px 2px rgba(255,255,255,0.1), 2px 2px 5px rgba(0,0,0,0.8);
+  }
+
+  /* 針の回転用ラッパー */
+  .hand-wrapper {
+    position: absolute;
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%;
+  }
+
+  /* 針の共通スタイル（クリップパスで矢印型にカット） */
+  .hand-outer {
+    position: absolute;
+    left: 50%;
+    bottom: 50%;
+    transform-origin: bottom center;
+    background-color: #111; /* 針の黒いフチ */
+    clip-path: polygon(50% 0%, 100% 20%, 80% 100%, 20% 100%, 0% 20%);
+  }
+  .hand-inner {
+    position: absolute;
+    bottom: 0;
+    background-color: #ffffff; /* 針の白い部分 */
+    clip-path: polygon(50% 0%, 100% 20%, 80% 100%, 20% 100%, 0% 20%);
+  }
+
+  /* 時針のサイズ設定 */
+  .hour-outer {
+    width: 24px;
+    height: 70px;
+    margin-left: -12px;
+  }
+  .hour-inner {
+    width: 14px;
+    height: 60px;
+    left: 50%;
+    margin-left: -7px;
+    bottom: 4px;
+  }
+
+  /* 分針のサイズ設定 */
+  .minute-outer {
+    width: 18px;
+    height: 100px;
+    margin-left: -9px;
+  }
+  .minute-inner {
+    width: 10px;
+    height: 90px;
+    left: 50%;
+    margin-left: -5px;
+    bottom: 4px;
+  }
+
+  /* 針の中心から反対側に伸びる黒い尻尾部分 */
+  .hand-tail {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    background-color: #111;
+    transform-origin: top center;
+  }
+  .hour-tail {
+    width: 14px;
+    height: 15px;
+    margin-left: -7px;
+  }
+  .minute-tail {
+    width: 12px;
+    height: 20px;
+    margin-left: -6px;
+  }
+
+  /* 中心を留める丸いキャップ */
+  .center-cap {
+    position: absolute;
+    top: 50%; 
+    left: 50%;
+    width: 18px; 
+    height: 18px;
+    background-color: #222;
+    border: 3px solid #000;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+  }
+</style>
+</head>
+<body>
+
+  <div class="watch-face" id="watch-face">
+    <div class="hand-wrapper" id="hour-wrapper">
+      <div class="hand-outer hour-outer">
+        <div class="hand-inner hour-inner"></div>
+      </div>
+      <div class="hand-tail hour-tail"></div>
+    </div>
+
+    <div class="hand-wrapper" id="minute-wrapper">
+      <div class="hand-outer minute-outer">
+        <div class="hand-inner minute-inner"></div>
+      </div>
+      <div class="hand-tail minute-tail"></div>
+    </div>
+
+    <div class="center-cap"></div>
+  </div>
+
+  <script>
+    // 12個の目盛り（インデックス）を生成して配置する
+    const face = document.getElementById('watch-face');
+    for (let i = 0; i < 12; i++) {
+      let marker = document.createElement('div');
+      marker.className = 'marker';
+      // 30度ずつ回転させて配置 (360度 / 12 = 30度)
+      marker.style.transform = `rotate(${i * 30}deg)`;
+      face.appendChild(marker);
+    }
+
+    // 時計の針を動かす関数
+    function updateClock() {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const seconds = now.getSeconds();
+
+      // 針の角度を計算
+      // 時針：1時間で30度 + 1分ごとに0.5度進む
+      const hourDeg = (hours % 12) * 30 + (minutes / 60) * 30;
+      // 分針：1分で6度 + 1秒ごとに0.1度進む
+      const minuteDeg = minutes * 6 + (seconds / 60) * 6;
+
+      // CSSのtransformを更新して針を回転させる
+      document.getElementById('hour-wrapper').style.transform = `rotate(${hourDeg}deg)`;
+      document.getElementById('minute-wrapper').style.transform = `rotate(${minuteDeg}deg)`;
+    }
+
+    // 1秒ごとにupdateClock関数を呼び出す
+    setInterval(updateClock, 1000);
+    // 読み込み時にすぐに時間を合わせる
+    updateClock();
+  </script>
+
+</body>
+</html>
