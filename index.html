@@ -1,186 +1,187 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>カスタムアナログ時計</title>
-<style>
-  /* 画面全体の背景を黒に設定 */
-  body {
-    background-color: #000000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    margin: 0;
-  }
-
-  /* 時計の基盤（文字盤） */
-  .watch-face {
-    width: 300px;
-    height: 300px;
-    background-color: #1a1a1a; /* 写真の基盤に合わせたダークグレー */
-    border-radius: 50%;
-    position: relative;
-    box-shadow: inset 0 0 20px rgba(0,0,0,0.9); /* 文字盤の深みを出す */
-  }
-
-  /* 立体的なインデックス（時間の目盛り） */
-  .marker {
-    position: absolute;
-    width: 14px;
-    height: 35px;
-    background-color: #2a2a2a;
-    top: 0;
-    left: 50%;
-    margin-left: -7px;
-    transform-origin: 50% 150px; /* 時計の中心を軸にする */
-    border-radius: 2px;
-    /* G-SHOCK特有の立体感を影で表現 */
-    box-shadow: inset -1px -1px 2px rgba(255,255,255,0.1), 2px 2px 5px rgba(0,0,0,0.8);
-  }
-
-  /* 針の回転用ラッパー */
-  .hand-wrapper {
-    position: absolute;
-    top: 0; 
-    left: 0; 
-    width: 100%; 
-    height: 100%;
-  }
-
-  /* 針の共通スタイル（クリップパスで矢印型にカット） */
-  .hand-outer {
-    position: absolute;
-    left: 50%;
-    bottom: 50%;
-    transform-origin: bottom center;
-    background-color: #111; /* 針の黒いフチ */
-    clip-path: polygon(50% 0%, 100% 20%, 80% 100%, 20% 100%, 0% 20%);
-  }
-  .hand-inner {
-    position: absolute;
-    bottom: 0;
-    background-color: #ffffff; /* 針の白い部分 */
-    clip-path: polygon(50% 0%, 100% 20%, 80% 100%, 20% 100%, 0% 20%);
-  }
-
-  /* 時針のサイズ設定 */
-  .hour-outer {
-    width: 24px;
-    height: 70px;
-    margin-left: -12px;
-  }
-  .hour-inner {
-    width: 14px;
-    height: 60px;
-    left: 50%;
-    margin-left: -7px;
-    bottom: 4px;
-  }
-
-  /* 分針のサイズ設定 */
-  .minute-outer {
-    width: 18px;
-    height: 100px;
-    margin-left: -9px;
-  }
-  .minute-inner {
-    width: 10px;
-    height: 90px;
-    left: 50%;
-    margin-left: -5px;
-    bottom: 4px;
-  }
-
-  /* 針の中心から反対側に伸びる黒い尻尾部分 */
-  .hand-tail {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    background-color: #111;
-    transform-origin: top center;
-  }
-  .hour-tail {
-    width: 14px;
-    height: 15px;
-    margin-left: -7px;
-  }
-  .minute-tail {
-    width: 12px;
-    height: 20px;
-    margin-left: -6px;
-  }
-
-  /* 中心を留める丸いキャップ */
-  .center-cap {
-    position: absolute;
-    top: 50%; 
-    left: 50%;
-    width: 18px; 
-    height: 18px;
-    background-color: #222;
-    border: 3px solid #000;
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.6);
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地震情報マッピングアプリ</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; }
+        header { padding: 15px; background: #2c3e50; color: white; text-align: center; }
+        header h2 { margin: 0; font-size: 1.5rem; }
+        #main { display: flex; flex: 1; overflow: hidden; }
+        #sidebar { width: 350px; padding: 20px; background: #f8f9fa; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index: 1000; }
+        #map { flex: 1; z-index: 1; }
+        .control-group { display: flex; flex-direction: column; gap: 5px; }
+        .control-group label { font-size: 0.9rem; font-weight: bold; color: #333; }
+        ul { list-style: none; padding: 0; margin: 0; }
+        li { padding: 12px; background: white; margin-bottom: 8px; cursor: pointer; border-radius: 6px; border: 1px solid #ddd; transition: all 0.2s; font-size: 0.9rem; }
+        li:hover { background: #e9ecef; border-color: #adb5bd; }
+        input[type="datetime-local"] { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
+        button { cursor: pointer; background: #3498db; color: white; border: none; border-radius: 4px; padding: 10px; font-size: 1rem; font-weight: bold; transition: background 0.2s; }
+        button:hover { background: #2980b9; }
+        #status-msg { font-size: 0.9rem; font-weight: bold; }
+        .loading { color: #e67e22; }
+        .success { color: #27ae60; }
+        .error { color: #e74c3c; }
+    </style>
 </head>
 <body>
-
-  <div class="watch-face" id="watch-face">
-    <div class="hand-wrapper" id="hour-wrapper">
-      <div class="hand-outer hour-outer">
-        <div class="hand-inner hour-inner"></div>
-      </div>
-      <div class="hand-tail hour-tail"></div>
+    <header>
+        <h2>地震情報マッピングアプリ</h2>
+    </header>
+    <div id="main">
+        <div id="sidebar">
+            <div id="status-msg" class="loading">気象庁からデータを取得中...</div>
+            
+            <div class="control-group">
+                <label>開始日時</label>
+                <input type="datetime-local" id="start-time">
+            </div>
+            <div class="control-group">
+                <label>終了日時</label>
+                <input type="datetime-local" id="end-time">
+            </div>
+            <button id="search-btn">この期間で検索</button>
+            <hr style="width: 100%; border: 0; border-top: 1px solid #ddd;">
+            <ul id="earthquake-list">
+                </ul>
+        </div>
+        <div id="map"></div>
     </div>
 
-    <div class="hand-wrapper" id="minute-wrapper">
-      <div class="hand-outer minute-outer">
-        <div class="hand-inner minute-inner"></div>
-      </div>
-      <div class="hand-tail minute-tail"></div>
-    </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let map;
+        let markers = []; // マーカーを管理する配列
+        let earthquakeData = []; // 取得した地震データを保持
 
-    <div class="center-cap"></div>
-  </div>
+        // 1. 地図の初期化
+        function initMap() {
+            // 初期位置を日本列島の中心付近に設定
+            map = L.map('map').setView([36.2048, 138.2529], 5); 
+            // OpenStreetMapのタイルを読み込み
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+        }
 
-  <script>
-    // 12個の目盛り（インデックス）を生成して配置する
-    const face = document.getElementById('watch-face');
-    for (let i = 0; i < 12; i++) {
-      let marker = document.createElement('div');
-      marker.className = 'marker';
-      // 30度ずつ回転させて配置 (360度 / 12 = 30度)
-      marker.style.transform = `rotate(${i * 30}deg)`;
-      face.appendChild(marker);
-    }
+        // 2. 気象庁のAPIから地震情報を取得
+        async function fetchJmaData() {
+            try {
+                // 気象庁の防災情報JSONリストを取得
+                const res = await fetch('https://www.jma.go.jp/bosai/quake/data/list.json');
+                if (!res.ok) throw new Error('Network response was not ok');
+                const data = await res.json();
+                earthquakeData = data;
+                
+                const statusEl = document.getElementById('status-msg');
+                statusEl.innerText = `データ取得完了（全${data.length}件）`;
+                statusEl.className = 'success';
+            } catch (error) {
+                const statusEl = document.getElementById('status-msg');
+                statusEl.innerText = 'データ取得に失敗しました';
+                statusEl.className = 'error';
+                console.error(error);
+            }
+        }
 
-    // 時計の針を動かす関数
-    function updateClock() {
-      const now = new Date();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
-      const seconds = now.getSeconds();
+        // 3. 気象庁の特殊な座標フォーマット(+35.6+139.7-40000/ など)を緯度経度に変換
+        function parseCoordinate(cod) {
+            if (!cod) return null;
+            // 正規表現で 緯度と経度を抽出
+            const match = cod.match(/^([+-]?\d+(?:\.\d+)?)([+-]?\d+(?:\.\d+)?)/);
+            if (match) {
+                return {
+                    lat: parseFloat(match[1]),
+                    lng: parseFloat(match[2])
+                };
+            }
+            return null;
+        }
 
-      // 針の角度を計算
-      // 時針：1時間で30度 + 1分ごとに0.5度進む
-      const hourDeg = (hours % 12) * 30 + (minutes / 60) * 30;
-      // 分針：1分で6度 + 1秒ごとに0.1度進む
-      const minuteDeg = minutes * 6 + (seconds / 60) * 6;
+        // 4. 日付のフォーマット変換 (YYYY/MM/DD HH:MM)
+        function formatDate(dateStr) {
+            const d = new Date(dateStr);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            return `${year}/${month}/${day} ${hours}:${minutes}`;
+        }
 
-      // CSSのtransformを更新して針を回転させる
-      document.getElementById('hour-wrapper').style.transform = `rotate(${hourDeg}deg)`;
-      document.getElementById('minute-wrapper').style.transform = `rotate(${minuteDeg}deg)`;
-    }
+        // 5. ユーザーが設定した期間で検索・リスト表示
+        function searchEarthquakes() {
+            const startStr = document.getElementById('start-time').value;
+            const endStr = document.getElementById('end-time').value;
+            
+            // 入力がない場合は全期間を対象にする
+            const startTime = startStr ? new Date(startStr).getTime() : 0;
+            const endTime = endStr ? new Date(endStr).getTime() : Infinity;
 
-    // 1秒ごとにupdateClock関数を呼び出す
-    setInterval(updateClock, 1000);
-    // 読み込み時にすぐに時間を合わせる
-    updateClock();
-  </script>
+            const listEl = document.getElementById('earthquake-list');
+            listEl.innerHTML = ''; // リストを初期化
 
+            // 期間でフィルタリング
+            const filteredData = earthquakeData.filter(eq => {
+                const eqTime = new Date(eq.at).getTime();
+                return eqTime >= startTime && eqTime <= endTime;
+            });
+
+            if (filteredData.length === 0) {
+                listEl.innerHTML = '<li>該当する地震データがありません。</li>';
+                return;
+            }
+
+            // リストに要素を追加
+            filteredData.forEach(eq => {
+                const li = document.createElement('li');
+                const formattedDate = formatDate(eq.at);
+                const mag = eq.mag !== "" ? `M${eq.mag}` : 'M不明';
+                const place = eq.anm || '場所不明';
+
+                li.innerHTML = `<strong>${formattedDate}</strong><br>${place} (${mag})`;
+                // リストクリック時に地図上にプロットするイベントを設定
+                li.onclick = () => plotEarthquake(eq);
+                listEl.appendChild(li);
+            });
+        }
+
+        // 6. 地図上にピンを立てて注釈(ポップアップ)を表示
+        function plotEarthquake(eq) {
+            // 古いマーカーを削除
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+
+            const coords = parseCoordinate(eq.cod);
+            if (!coords) {
+                alert('この地震の座標データが存在しません。');
+                return;
+            }
+
+            const formattedDate = formatDate(eq.at);
+            const mag = eq.mag !== "" ? `M${eq.mag}` : 'M不明';
+            
+            // ご要望の注釈テキスト：「日付 マグニチュード」
+            const popupText = `<div style="font-size:14px;"><strong>${formattedDate}</strong><br>マグニチュード: <strong>${mag}</strong><br>${eq.anm || ''}</div>`;
+
+            // マーカーを設置
+            const marker = L.marker([coords.lat, coords.lng]).addTo(map);
+            marker.bindPopup(popupText).openPopup();
+            
+            // マーカーの位置にズーム
+            map.setView([coords.lat, coords.lng], 8);
+            markers.push(marker);
+        }
+
+        // イベントリスナーの登録と初期化実行
+        document.getElementById('search-btn').addEventListener('click', searchEarthquakes);
+        
+        window.onload = () => {
+            initMap();
+            fetchJmaData();
+        };
+    </script>
 </body>
 </html>
