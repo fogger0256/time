@@ -15,15 +15,10 @@
         .control-group { display: flex; flex-direction: column; gap: 5px; }
         .control-group label { font-size: 0.9rem; font-weight: bold; color: #333; }
         ul { list-style: none; padding: 0; margin: 0; }
-        
-        /* リストのスタイル調整 */
         li { padding: 12px; background: white; margin-bottom: 8px; cursor: pointer; border-radius: 6px; border: 1px solid #ddd; border-left: 5px solid transparent; transition: all 0.2s; font-size: 0.9rem; }
         li:hover { background: #e9ecef; border-color: #adb5bd; }
-        
-        /* 選択されたリスト項目のスタイル */
         li.selected { background: #e8f4fd; border-color: #b6d4fe; border-left: 5px solid #3498db; }
         li.selected:hover { background: #d1e7dd; }
-
         input[type="datetime-local"] { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
         button { cursor: pointer; background: #3498db; color: white; border: none; border-radius: 4px; padding: 10px; font-size: 1rem; font-weight: bold; transition: background 0.2s; }
         button:hover { background: #2980b9; }
@@ -63,9 +58,9 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         let map;
-        let markers = []; // 地図上の丸(マーカー)を管理する配列
-        let earthquakeData = []; // 取得した地震データ全体
-        let selectedEarthquakes = new Set(); // 選択された地震データを保持(重複を防ぐためSetを使用)
+        let markers = []; 
+        let earthquakeData = []; 
+        let selectedEarthquakes = new Set(); 
 
         // 1. 地図の初期化
         function initMap() {
@@ -75,17 +70,39 @@
             }).addTo(map);
         }
 
-        // 2. 気象庁のAPIから地震情報を取得
+        // 2. 気象庁のAPIから地震情報を取得し「情報発表した地震」に整理する
         async function fetchJmaData() {
             try {
                 const res = await fetch('https://www.jma.go.jp/bosai/quake/data/list.json');
                 if (!res.ok) throw new Error('Network response was not ok');
-                const data = await res.json();
-                earthquakeData = data;
+                const rawData = await res.json();
+                
+                // --- 重複排除の処理（気象庁のマップと同じ仕様にする） ---
+                const uniqueEqMap = new Map();
+                
+                rawData.forEach(eq => {
+                    // 座標(cod)がない情報（震度速報など）は地図に打てないため除外
+                    if (!eq.cod) return;
+                    
+                    // eid（固有のイベントID）をキーにして重複を排除する。
+                    // JSONの配列は新しい情報から順に並んでいるため、
+                    // 最初にヒットしたデータ（＝その地震に対する最新の発表内容）のみを採用する。
+                    if (!uniqueEqMap.has(eq.eid)) {
+                        uniqueEqMap.set(eq.eid, eq);
+                    }
+                });
+
+                // Mapから純粋な「地震リスト」の配列に戻す
+                earthquakeData = Array.from(uniqueEqMap.values());
+                // ----------------------------------------------------
                 
                 const statusEl = document.getElementById('status-msg');
-                statusEl.innerText = `データ取得完了（全${data.length}件）`;
+                statusEl.innerText = `データ取得完了（全${earthquakeData.length}件の地震）`;
                 statusEl.className = 'success';
+
+                // 取得が完了したら、すぐに全期間のリストを表示させる
+                searchEarthquakes();
+                
             } catch (error) {
                 const statusEl = document.getElementById('status-msg');
                 statusEl.innerText = 'データ取得に失敗しました';
@@ -94,7 +111,7 @@
             }
         }
 
-        // 3. 座標フォーマット変換 (+35.6+139.7-40000/ -> lat, lng)
+        // 3. 座標フォーマット変換
         function parseCoordinate(cod) {
             if (!cod) return null;
             const match = cod.match(/^([+-]?\d+(?:\.\d+)?)([+-]?\d+(?:\.\d+)?)/);
@@ -126,7 +143,6 @@
             const listEl = document.getElementById('earthquake-list');
             listEl.innerHTML = '';
             
-            // 検索し直した時は選択状態と地図上の丸をリセットする
             selectedEarthquakes.clear(); 
             clearMap();
 
@@ -148,16 +164,15 @@
 
                 li.innerHTML = `<strong>${formattedDate}</strong><br>${place} (${mag})`;
                 
-                // リスト項目をクリックしたときのトグル（選択/解除）処理
                 li.onclick = () => {
                     if (selectedEarthquakes.has(eq)) {
-                        selectedEarthquakes.delete(eq); // 選択解除
+                        selectedEarthquakes.delete(eq);
                         li.classList.remove('selected');
                     } else {
-                        selectedEarthquakes.add(eq); // 選択
+                        selectedEarthquakes.add(eq);
                         li.classList.add('selected');
                     }
-                    plotEarthquakes(); // 地図を更新
+                    plotEarthquakes(); 
                 };
                 listEl.appendChild(li);
             });
@@ -171,11 +186,11 @@
 
         // 6. 選択されたすべての地震を地図上に丸でプロット
         function plotEarthquakes() {
-            clearMap(); // 一度すべて消す
+            clearMap(); 
 
             if (selectedEarthquakes.size === 0) return;
 
-            let bounds = []; // 全ての丸が収まる範囲を計算するための配列
+            let bounds = []; 
 
             selectedEarthquakes.forEach(eq => {
                 const coords = parseCoordinate(eq.cod);
@@ -185,35 +200,28 @@
                 const magVal = parseFloat(eq.mag);
                 const magText = isNaN(magVal) ? 'M不明' : `M${eq.mag}`;
                 
-                // ポップアップテキスト
                 const popupText = `<div style="font-size:14px;"><strong>${formattedDate}</strong><br>マグニチュード: <strong>${magText}</strong><br>${eq.anm || ''}</div>`;
 
-                // マグニチュードに応じた丸の半径（M不明の場合は固定値）
-                // 指数関数的に大きさを変えることで地震の規模を直感的に表現
                 const radius = isNaN(magVal) ? 5 : Math.max(3, magVal * 2.5);
 
-                // ピン(L.marker)の代わりに丸(L.circleMarker)を使用
                 const circle = L.circleMarker([coords.lat, coords.lng], {
                     radius: radius,
-                    color: '#e74c3c',       // 枠線の色
-                    weight: 2,              // 枠線の太さ
-                    fillColor: '#ff7675',   // 塗りつぶしの色
-                    fillOpacity: 0.6        // 塗りつぶしの透明度
+                    color: '#e74c3c',       
+                    weight: 2,              
+                    fillColor: '#ff7675',   
+                    fillOpacity: 0.6        
                 }).addTo(map);
 
                 circle.bindPopup(popupText);
                 markers.push(circle);
-                bounds.push([coords.lat, coords.lng]); // 座標を記録
+                bounds.push([coords.lat, coords.lng]); 
             });
 
-            // 選択された丸が全て地図上に収まるようにズームと位置を自動調整
             if (bounds.length > 0) {
-                // paddingを設定して画面端ギリギリにならないようにする
                 map.fitBounds(bounds, { padding: [50, 50], maxZoom: 8 });
             }
         }
 
-        // イベントリスナーの登録
         document.getElementById('search-btn').addEventListener('click', searchEarthquakes);
         
         window.onload = () => {
