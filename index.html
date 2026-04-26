@@ -3,231 +3,265 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>地震情報マッピングアプリ</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <title>年間最高気温 比較アプリ</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; }
-        header { padding: 15px; background: #2c3e50; color: white; text-align: center; }
-        header h2 { margin: 0; font-size: 1.5rem; }
-        #main { display: flex; flex: 1; overflow: hidden; }
-        #sidebar { width: 350px; padding: 20px; background: #f8f9fa; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index: 1000; }
-        #map { flex: 1; z-index: 1; }
-        .control-group { display: flex; flex-direction: column; gap: 5px; }
-        .control-group label { font-size: 0.9rem; font-weight: bold; color: #333; }
-        ul { list-style: none; padding: 0; margin: 0; }
-        li { padding: 12px; background: white; margin-bottom: 8px; cursor: pointer; border-radius: 6px; border: 1px solid #ddd; border-left: 5px solid transparent; transition: all 0.2s; font-size: 0.9rem; }
-        li:hover { background: #e9ecef; border-color: #adb5bd; }
-        li.selected { background: #e8f4fd; border-color: #b6d4fe; border-left: 5px solid #3498db; }
-        li.selected:hover { background: #d1e7dd; }
-        input[type="datetime-local"] { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
-        button { cursor: pointer; background: #3498db; color: white; border: none; border-radius: 4px; padding: 10px; font-size: 1rem; font-weight: bold; transition: background 0.2s; }
-        button:hover { background: #2980b9; }
-        #status-msg { font-size: 0.9rem; font-weight: bold; }
-        .loading { color: #e67e22; }
-        .success { color: #27ae60; }
-        .error { color: #e74c3c; }
-        .instruction { font-size: 0.85rem; color: #666; margin-top: -5px; }
+        /* 全体のレイアウト設定 */
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            background-color: #f8f9fa;
+        }
+
+        /* 左側のコントロールパネル */
+        .sidebar {
+            width: 320px;
+            background-color: #ffffff;
+            padding: 30px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .sidebar h1 {
+            font-size: 20px;
+            color: #333;
+            margin: 0 0 10px 0;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .form-group select {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+            background-color: #fff;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .form-group select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        /* 右側のグラフエリア */
+        .main-content {
+            flex-grow: 1;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            background-color: #f8f9fa;
+        }
+
+        .chart-wrapper {
+            flex-grow: 1;
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            position: relative;
+        }
     </style>
 </head>
 <body>
-    <header>
-        <h2>地震情報マッピングアプリ (比較モード)</h2>
-    </header>
-    <div id="main">
-        <div id="sidebar">
-            <div id="status-msg" class="loading">気象庁からデータを取得中...</div>
-            
-            <div class="control-group">
-                <label>開始日時</label>
-                <input type="datetime-local" id="start-time">
-            </div>
-            <div class="control-group">
-                <label>終了日時</label>
-                <input type="datetime-local" id="end-time">
-            </div>
-            <button id="search-btn">この期間で検索</button>
-            <div class="instruction">※リストをクリックで複数選択・解除できます。</div>
-            <hr style="width: 100%; border: 0; border-top: 1px solid #ddd;">
-            
-            <ul id="earthquake-list">
-                </ul>
+
+    <div class="sidebar">
+        <h1>気温データ設定</h1>
+        
+        <div class="form-group">
+            <label for="locationSelect">📍 場所 (アメダス)</label>
+            <select id="locationSelect">
+                <option value="sapporo">札幌</option>
+                <option value="tokyo" selected>東京</option>
+                <option value="osaka">大阪</option>
+                <option value="naha">那覇</option>
+            </select>
         </div>
-        <div id="map"></div>
+
+        <div class="form-group">
+            <label for="baseYearSelect">📅 対象期間 (年)</label>
+            <select id="baseYearSelect">
+                <option value="2023" selected>2023年</option>
+                <option value="2022">2022年</option>
+                <option value="2021">2021年</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="compareYearSelect">🔄 比較したい年</label>
+            <select id="compareYearSelect">
+                <option value="none">-- 比較しない --</option>
+                <option value="2023">2023年</option>
+                <option value="2022">2022年</option>
+                <option value="2021">2021年</option>
+                <option value="2020" selected>2020年</option>
+                <option value="2010">2010年</option>
+            </select>
+        </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <div class="main-content">
+        <div class="chart-wrapper">
+            <canvas id="temperatureChart"></canvas>
+        </div>
+    </div>
+
     <script>
-        let map;
-        let markers = []; 
-        let earthquakeData = []; 
-        let selectedEarthquakes = new Set(); 
-
-        // 1. 地図の初期化
-        function initMap() {
-            map = L.map('map').setView([36.2048, 138.2529], 5); 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
-        }
-
-        // 2. 気象庁のAPIから地震情報を取得し「情報発表した地震」に整理する
-        async function fetchJmaData() {
-            try {
-                const res = await fetch('https://www.jma.go.jp/bosai/quake/data/list.json');
-                if (!res.ok) throw new Error('Network response was not ok');
-                const rawData = await res.json();
-                
-                // --- 重複排除の処理（気象庁のマップと同じ仕様にする） ---
-                const uniqueEqMap = new Map();
-                
-                rawData.forEach(eq => {
-                    // 座標(cod)がない情報（震度速報など）は地図に打てないため除外
-                    if (!eq.cod) return;
-                    
-                    // eid（固有のイベントID）をキーにして重複を排除する。
-                    // JSONの配列は新しい情報から順に並んでいるため、
-                    // 最初にヒットしたデータ（＝その地震に対する最新の発表内容）のみを採用する。
-                    if (!uniqueEqMap.has(eq.eid)) {
-                        uniqueEqMap.set(eq.eid, eq);
-                    }
-                });
-
-                // Mapから純粋な「地震リスト」の配列に戻す
-                earthquakeData = Array.from(uniqueEqMap.values());
-                // ----------------------------------------------------
-                
-                const statusEl = document.getElementById('status-msg');
-                statusEl.innerText = `データ取得完了（全${earthquakeData.length}件の地震）`;
-                statusEl.className = 'success';
-
-                // 取得が完了したら、すぐに全期間のリストを表示させる
-                searchEarthquakes();
-                
-            } catch (error) {
-                const statusEl = document.getElementById('status-msg');
-                statusEl.innerText = 'データ取得に失敗しました';
-                statusEl.className = 'error';
-                console.error(error);
+        // --- モックデータ（気象庁のデータを模したダミーデータ） ---
+        // 実際の運用ではAPI等から取得する処理に置き換えてください。
+        const mockData = {
+            sapporo: {
+                base: [ -0.9, 0.1, 4.0, 11.5, 17.3, 21.5, 24.9, 26.4, 22.4, 16.2, 8.5, 2.1 ],
+                variation: 2 // 年ごとのブレ幅
+            },
+            tokyo: {
+                base: [ 9.6, 10.4, 13.6, 19.0, 22.9, 25.5, 29.2, 30.8, 26.9, 21.5, 16.3, 11.9 ],
+                variation: 2.5
+            },
+            osaka: {
+                base: [ 9.5, 10.2, 13.7, 19.9, 24.5, 27.8, 31.6, 33.4, 29.3, 23.3, 17.6, 12.3 ],
+                variation: 2.5
+            },
+            naha: {
+                base: [ 19.5, 19.8, 21.7, 24.1, 26.7, 29.4, 31.8, 31.5, 30.4, 27.9, 24.6, 21.2 ],
+                variation: 1.5
             }
-        }
-
-        // 3. 座標フォーマット変換
-        function parseCoordinate(cod) {
-            if (!cod) return null;
-            const match = cod.match(/^([+-]?\d+(?:\.\d+)?)([+-]?\d+(?:\.\d+)?)/);
-            if (match) {
-                return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
-            }
-            return null;
-        }
-
-        // 4. 日付のフォーマット変換
-        function formatDate(dateStr) {
-            const d = new Date(dateStr);
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            const hours = String(d.getHours()).padStart(2, '0');
-            const minutes = String(d.getMinutes()).padStart(2, '0');
-            return `${year}/${month}/${day} ${hours}:${minutes}`;
-        }
-
-        // 5. 検索とリスト表示
-        function searchEarthquakes() {
-            const startStr = document.getElementById('start-time').value;
-            const endStr = document.getElementById('end-time').value;
-            
-            const startTime = startStr ? new Date(startStr).getTime() : 0;
-            const endTime = endStr ? new Date(endStr).getTime() : Infinity;
-
-            const listEl = document.getElementById('earthquake-list');
-            listEl.innerHTML = '';
-            
-            selectedEarthquakes.clear(); 
-            clearMap();
-
-            const filteredData = earthquakeData.filter(eq => {
-                const eqTime = new Date(eq.at).getTime();
-                return eqTime >= startTime && eqTime <= endTime;
-            });
-
-            if (filteredData.length === 0) {
-                listEl.innerHTML = '<li>該当する地震データがありません。</li>';
-                return;
-            }
-
-            filteredData.forEach(eq => {
-                const li = document.createElement('li');
-                const formattedDate = formatDate(eq.at);
-                const mag = eq.mag !== "" ? `M${eq.mag}` : 'M不明';
-                const place = eq.anm || '場所不明';
-
-                li.innerHTML = `<strong>${formattedDate}</strong><br>${place} (${mag})`;
-                
-                li.onclick = () => {
-                    if (selectedEarthquakes.has(eq)) {
-                        selectedEarthquakes.delete(eq);
-                        li.classList.remove('selected');
-                    } else {
-                        selectedEarthquakes.add(eq);
-                        li.classList.add('selected');
-                    }
-                    plotEarthquakes(); 
-                };
-                listEl.appendChild(li);
-            });
-        }
-
-        // 地図上の丸をすべて消す関数
-        function clearMap() {
-            markers.forEach(marker => map.removeLayer(marker));
-            markers = [];
-        }
-
-        // 6. 選択されたすべての地震を地図上に丸でプロット
-        function plotEarthquakes() {
-            clearMap(); 
-
-            if (selectedEarthquakes.size === 0) return;
-
-            let bounds = []; 
-
-            selectedEarthquakes.forEach(eq => {
-                const coords = parseCoordinate(eq.cod);
-                if (!coords) return;
-
-                const formattedDate = formatDate(eq.at);
-                const magVal = parseFloat(eq.mag);
-                const magText = isNaN(magVal) ? 'M不明' : `M${eq.mag}`;
-                
-                const popupText = `<div style="font-size:14px;"><strong>${formattedDate}</strong><br>マグニチュード: <strong>${magText}</strong><br>${eq.anm || ''}</div>`;
-
-                const radius = isNaN(magVal) ? 5 : Math.max(3, magVal * 2.5);
-
-                const circle = L.circleMarker([coords.lat, coords.lng], {
-                    radius: radius,
-                    color: '#e74c3c',       
-                    weight: 2,              
-                    fillColor: '#ff7675',   
-                    fillOpacity: 0.6        
-                }).addTo(map);
-
-                circle.bindPopup(popupText);
-                markers.push(circle);
-                bounds.push([coords.lat, coords.lng]); 
-            });
-
-            if (bounds.length > 0) {
-                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 8 });
-            }
-        }
-
-        document.getElementById('search-btn').addEventListener('click', searchEarthquakes);
-        
-        window.onload = () => {
-            initMap();
-            fetchJmaData();
         };
+
+        // 指定した場所・年のダミーデータを生成する関数
+        function generateData(location, year) {
+            const baseData = mockData[location].base;
+            const variation = mockData[location].variation;
+            // 年の数字を使って疑似乱数的にデータをずらす
+            const seed = parseInt(year);
+            return baseData.map((temp, index) => {
+                const randomOffset = Math.sin(seed + index) * variation;
+                return (temp + randomOffset).toFixed(1); // 小数第1位まで
+            });
+        }
+
+        // --- グラフの初期化 ---
+        const ctx = document.getElementById('temperatureChart').getContext('2d');
+        let tempChart;
+
+        function renderChart() {
+            const location = document.getElementById('locationSelect').value;
+            const locationName = document.getElementById('locationSelect').options[document.getElementById('locationSelect').selectedIndex].text;
+            
+            const baseYear = document.getElementById('baseYearSelect').value;
+            const compareYear = document.getElementById('compareYearSelect').value;
+
+            // データ取得
+            const baseData = generateData(location, baseYear);
+            
+            // データセットの構成
+            const datasets = [{
+                label: `${locationName} - ${baseYear}年 最高気温 (℃)`,
+                data: baseData,
+                borderColor: 'rgba(255, 50, 50, 1)', // 赤色
+                backgroundColor: 'rgba(255, 50, 50, 0.1)',
+                borderWidth: 3,
+                pointBackgroundColor: 'rgba(255, 50, 50, 1)',
+                pointRadius: 4,
+                fill: true,
+                tension: 0.3 // 曲線を滑らかに
+            }];
+
+            // 比較年が選択されている場合、データセットを追加
+            if (compareYear !== "none") {
+                const compareData = generateData(location, compareYear);
+                datasets.push({
+                    label: `${locationName} - ${compareYear}年 最高気温 (℃)`,
+                    data: compareData,
+                    borderColor: 'rgba(54, 162, 235, 1)', // 青色（別の色）
+                    backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                    borderWidth: 3,
+                    borderDash: [5, 5], // 比較用は点線にして見やすく
+                    pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                    pointRadius: 4,
+                    fill: false,
+                    tension: 0.3
+                });
+            }
+
+            // 既存のグラフがあれば破棄して再描画
+            if (tempChart) {
+                tempChart.destroy();
+            }
+
+            tempChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { font: { size: 14 } }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        }
+                    },
+                    scales: {
+                        y: {
+                            title: {
+                                display: true,
+                                text: '気温 (℃)',
+                                font: { size: 14 }
+                            },
+                            suggestedMin: -10, // メモリの最小値の目安
+                            suggestedMax: 40   // メモリの最大値の目安
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '月',
+                                font: { size: 14 }
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        // --- イベントリスナーの設定 ---
+        // プルダウンが変更されたらグラフを再描画
+        document.getElementById('locationSelect').addEventListener('change', renderChart);
+        document.getElementById('baseYearSelect').addEventListener('change', renderChart);
+        document.getElementById('compareYearSelect').addEventListener('change', renderChart);
+
+        // 初回描画の実行
+        renderChart();
     </script>
 </body>
 </html>
